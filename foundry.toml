@@ -7,9 +7,14 @@ optimizer = true
 optimizer_runs = 800
 remappings = [
   '@openzeppelin/=node_modules/@openzeppelin/',
+  '@openzeppelin/contracts=node_modules/@openzeppelin/contracts/'
 ]
 block_number = 16826654
 block_timestamp = 1678803642
+ast = true
+ffi = true
+build_info = true
+extra_output = ["storageLayout"]
 
 [rpc_endpoints]
 mainnet = "${MAINNET_RPC_URL}"
