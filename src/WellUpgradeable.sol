@@ -48,6 +48,20 @@ contract WellUpgradeable is ERC20PermitUpgradeable, IWell, IWellErrors, Reentran
         _disableInitializers();
     }
 
+    // add new func as brean sent in pic 
+    // change to new owner in _authorizeUpgrade
+    // deploy well impl upgradeable by itself
+    // deploy the well with the new impl with the new param 
+
+    // Bore Well
+    // address wellAddress = IAquifer(aquifer).boreWell(
+    //     wellImplementation,
+    //     encodeWellParams(aquifer, wellEncodedData),
+    //     abi.encodeWithSignature("init(string,string,address)", wellName, wellSymbol, owner),
+    //     salt
+    // );
+
+    
     /**
     * Perform an upgrade of an ERC1967Proxy, when this contract.
     * is set as the implementation behind such a proxy.
@@ -56,21 +70,24 @@ contract WellUpgradeable is ERC20PermitUpgradeable, IWell, IWellErrors, Reentran
     */
     function _authorizeUpgrade(address) internal override onlyOwner {}
 
-    function init(string memory _name, string memory _symbol) external initializer {
-        __Ownable_init();
+    function init(string memory _name, string memory _symbol, address owner) external initializer {
+        // owner of well param as the aquifier address will be the owner initially
+        // ownable init transfers ownership to msg.sender
         __ERC20Permit_init(_name);
         __ERC20_init(_name, _symbol);
         __ReentrancyGuard_init();
+        __UUPSUpgradeable_init();
+        __Ownable_init(owner);
 
-        // IERC20[] memory _tokens = tokens();
-        // uint256 tokensLength = _tokens.length;
-        // for (uint256 i; i < tokensLength - 1; ++i) {
-        //     for (uint256 j = i + 1; j < tokensLength; ++j) {
-        //         if (_tokens[i] == _tokens[j]) {
-        //             revert DuplicateTokens(_tokens[i]);
-        //         }
-        //     }
-        // }
+        IERC20[] memory _tokens = tokens();
+        uint256 tokensLength = _tokens.length;
+        for (uint256 i; i < tokensLength - 1; ++i) {
+            for (uint256 j = i + 1; j < tokensLength; ++j) {
+                if (_tokens[i] == _tokens[j]) {
+                    revert DuplicateTokens(_tokens[i]);
+                }
+            }
+        }
     }
 
     function isInitialized() external view returns (bool) {
