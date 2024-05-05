@@ -112,7 +112,7 @@ abstract contract TestHelper is Test, WellDeployer {
         addLiquidityEqualAmount(address(this), initialLiquidity);
     }
 
-    //////////////////////// UPgradeable Well with owner ////////////////////////
+    //////////////////////// Upgradeable Well with owner ////////////////////////
 
     function setupWellWithOwner(uint256 n, address owner) internal {
         setupWellWithOwner(n, deployWellFunction(), deployPumps(1), owner);

@@ -10,7 +10,7 @@ import {IERC20, SafeERC20} from "oz/token/ERC20/utils/SafeERC20.sol";
 
 /**
  * @title Well
- * @author Publius, Silo Chad, Brean
+ * @author Publius, Silo Chad, Brean, Deadmanwalking
  * @dev A Well is a constant function AMM allowing the provisioning of liquidity
  * into a single pooled on-chain liquidity position.
  *
