@@ -16,6 +16,7 @@ import {WellDeployer} from "script/helpers/WellDeployer.sol";
 import {LibWellUpgradeableConstructor} from "src/libraries/LibWellUpgradeableConstructor.sol";
 import {LibContractInfo} from "src/libraries/LibContractInfo.sol";
 import {MockToken} from "mocks/tokens/MockToken.sol";
+import {MockWellUpgradeable} from "mocks/wells/MockWellUpgradeable.sol";
 
 
 contract WellUpgradeTest is Test {
@@ -24,7 +25,8 @@ contract WellUpgradeTest is Test {
     IERC20 constant WETH = IERC20(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2); // WETH9
 
     address proxyAddress;
-    uint256 mainnetFork;
+    address aquifer;
+    address initialOwner;
 
     function encodeAndBoreWell(
         address _aquifer,
@@ -56,30 +58,87 @@ contract WellUpgradeTest is Test {
         IPump mockPump = new MockPump();
         Call[] memory pumps = new Call[](1);
         pumps[0] = Call(address(mockPump), new bytes(0));
-        address aquifer = address(new Aquifer());
+        aquifer = address(new Aquifer());
         address wellImplementation = address(new WellUpgradeable());
-        address owner = address(this);
+        initialOwner = makeAddr("owner");
 
         // Well
-        WellUpgradeable well = encodeAndBoreWell(aquifer, wellImplementation, tokens, wellFunction, pumps, bytes32(0), owner);
+        WellUpgradeable well = encodeAndBoreWell(aquifer, wellImplementation, tokens, wellFunction, pumps, bytes32(0), initialOwner);
 
         console.log("Deployed CP2 at address: ", address(cp2));
         console.log("Deployed Pump at address: ", address(pumps[0].target));
         console.log("Well deployed at address: ", address(well));
 
+        // Sum up of what is going on here
+        // We encode and bore a well upgradeable from the aquifer
+        // The well upgradeable additionally takes in an owner address so we modify the init function call
+        // to include the owner address. 
+        // When the new well is deployed, all init data are stored in the implementation storage 
+        // including pump and well function data
+        // Then we deploy a proxy for the well upgradeable and call the init function on the proxy
+        // We have modified the deployUUPSProxy to remove deploying the implementation and only deploy the proxy
+        // with the given well address and init data.
+        // When we deploy the proxy, the init data is stored in the proxy storage and the well is initialized 
+        // for the second time. We can now control the well via delegate calls to the proxy address.
+
+        // NOTE: With this setup the well is initialized twice, once when we bore the well
+        // ond once we deploy the proxy. This should not be possible but it is due
+        // to the storage being used each time. The first time we init storage on the well implementation itself
+        // and the second time we init storage on the proxy which is what we want.
+        // So when calling various functions of the well from the proxy address, the init data such as the symbol
+        // will be the data from the second call to init ie the one from deployUUPSProxy
+
         proxyAddress = Upgrades.deployUUPSProxy(
             "WellUpgradeable.sol", // name
-            abi.encodeCall(WellUpgradeable.init, ("A", "B", owner)), // init data (name, symbol, owner)
+            abi.encodeCall(WellUpgradeable.init, ("WELL", "WELL", initialOwner)), // init data (name, symbol, owner)
             address(well) // implementation address
         );
         console.logAddress(proxyAddress);
     }
 
-    // deploy well upgradeable just the implementation without proxy 
-    // call borewell with that implementation and figure out ownership parameters
+    ///////////////////// Storage Tests /////////////////////
+
+    function test_ProxyGetAquifer() public {
+        assertEq(address(aquifer), WellUpgradeable(proxyAddress).aquifer());
+    }
+
+    function test_ProxyGetSymbolInStorage() public {
+        assertEq("WELL", WellUpgradeable(proxyAddress).symbol());
+    }
+
     function testProxyInitVersion() public {
         uint256 expectedVersion = 1;
         assertEq(expectedVersion, WellUpgradeable(proxyAddress).getVersion());
     }
 
+    ////////////// Ownership Tests //////////////
+
+    function test_ProxyOwner() public {
+        assertEq(makeAddr("owner"), WellUpgradeable(proxyAddress).owner());
+    }
+
+    function test_ProxyTransferOwnership() public {
+        vm.prank(initialOwner);
+        address newOwner = makeAddr("newOwner");
+        WellUpgradeable(proxyAddress).transferOwnership(newOwner);
+        assertEq(newOwner, WellUpgradeable(proxyAddress).owner());
+    }
+
+    function test_RevertTransferOwnershipFromNotOnwer() public {
+        vm.expectRevert();
+        address notOwner = makeAddr("notOwner");
+        vm.prank(notOwner);
+        WellUpgradeable(proxyAddress).transferOwnership(notOwner);
+    }
+
+    ////////////////////// Upgrade Tests //////////////////////
+
+    function test_UpgradeToNewImplementation() public {
+        Upgrades.upgradeProxy(
+            proxyAddress,
+            "MockWellUpgradeable.sol",
+            ""
+        );
+        assertEq(2, MockWellUpgradeable(proxyAddress).getVersion());
+    }
 }

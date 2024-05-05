@@ -11,6 +11,7 @@ import {MockPump} from "mocks/pumps/MockPump.sol";
 import {Users} from "test/helpers/Users.sol";
 
 import {Well, Call, IERC20, IWell, IWellFunction} from "src/Well.sol";
+import {WellUpgradeable} from "src/WellUpgradeable.sol";
 import {Aquifer} from "src/Aquifer.sol";
 import {ConstantProduct2} from "src/functions/ConstantProduct2.sol";
 
@@ -55,6 +56,9 @@ abstract contract TestHelper is Test, WellDeployer {
     // Primary well
     Well well;
     address wellImplementation;
+
+    // Well upgradeable
+    WellUpgradeable wellUpgradeable;
 
     // Primary well components
     IERC20[] tokens;
@@ -107,6 +111,48 @@ abstract contract TestHelper is Test, WellDeployer {
         // Add initial liquidity from TestHelper
         addLiquidityEqualAmount(address(this), initialLiquidity);
     }
+
+    //////////////////////// UPgradeable Well with owner ////////////////////////
+
+    function setupWellWithOwner(uint256 n, address owner) internal {
+        setupWellWithOwner(n, deployWellFunction(), deployPumps(1), owner);
+    }
+
+    function setupWellWithOwner(uint256 n, Call[] memory _pumps, address owner) internal {
+        setupWellWithOwner(n, deployWellFunction(), _pumps, owner);
+    }
+
+    function setupWellWithOwner(uint256 n, Call memory _wellFunction, Call[] memory _pumps, address owner) internal {
+        setupWellWithOwner(_wellFunction, _pumps, deployMockTokens(n), owner);
+    }
+
+    function setupWellWithOwner(Call memory _wellFunction, Call[] memory _pumps, IERC20[] memory _tokens, address owner) internal {
+        tokens = _tokens;
+        wellFunction = _wellFunction;
+        for (uint256 i; i < _pumps.length; i++) {
+            pumps.push(_pumps[i]);
+        }
+
+        initUser();
+
+        wellImplementation = deployWellUpgradeableImplementation();
+        aquifer = new Aquifer();
+        wellUpgradeable = encodeAndBoreWellUpgradeable(address(aquifer), wellImplementation, tokens, wellFunction, pumps, bytes32(0), owner);
+
+        // Mint mock tokens to user
+        // mintTokens(user, initialLiquidity);
+        // mintTokens(user2, initialLiquidity);
+        // approveMaxTokens(user, address(wellUpgradeable));
+        // approveMaxTokens(user2, address(wellUpgradeable));
+
+        // Mint mock tokens to TestHelper
+        // mintTokens(address(this), initialLiquidity);
+        // approveMaxTokens(address(this), address(well));
+
+        // Add initial liquidity from TestHelper
+        // addLiquidityEqualAmount(user, initialLiquidity);
+    }
+
 
     function setupWellWithFeeOnTransfer(uint256 n) internal {
         Call memory _wellFunction = Call(address(new ConstantProduct2()), new bytes(0));
@@ -211,6 +257,11 @@ abstract contract TestHelper is Test, WellDeployer {
     /// @dev deploy the Well contract
     function deployWellImplementation() internal returns (address) {
         return address(new Well());
+    }
+
+    /// @dev deploy the Well contract
+    function deployWellUpgradeableImplementation() internal returns (address) {
+        return address(new WellUpgradeable());
     }
 
     function mintAndAddLiquidity(address to, uint256[] memory amounts) internal {

@@ -11,6 +11,9 @@ import {IPump} from "src/interfaces/pumps/IPump.sol";
 import {IWellFunction} from "src/interfaces/IWellFunction.sol";
 import {LibBytes} from "src/libraries/LibBytes.sol";
 import {ClonePlus} from "src/utils/ClonePlus.sol";
+import {UUPSUpgradeable} from "ozu/proxy/utils/UUPSUpgradeable.sol";
+import {OwnableUpgradeable} from "ozu/access/OwnableUpgradeable.sol";
+
 
 /**
  * @title Well
@@ -32,24 +35,54 @@ import {ClonePlus} from "src/utils/ClonePlus.sol";
  * - When recieving fee on transfer tokens from a Well (swapping to and removing liquidity),
  *   INCLUDE the fee that is taken on transfer when calculating amount out values.
  */
-contract Well is ERC20PermitUpgradeable, IWell, IWellErrors, ReentrancyGuardUpgradeable, ClonePlus {
+contract WellUpgradeableOld is ERC20PermitUpgradeable, IWell, IWellErrors, ReentrancyGuardUpgradeable, ClonePlus, UUPSUpgradeable, OwnableUpgradeable  {
     using SafeERC20 for IERC20;
 
     uint256 private constant PACKED_ADDRESS = 20;
     uint256 private constant ONE_WORD_PLUS_PACKED_ADDRESS = 52; // For gas efficiency purposes
     bytes32 private constant RESERVES_STORAGE_SLOT = 0x4bba01c388049b5ebd30398b65e8ad45b632802c5faf4964e58085ea8ab03715; // bytes32(uint256(keccak256("reserves.storage.slot")) - 1);
 
-    // Avoid having upgradeability issues with WellUpgradeable since we inherit Well directly
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         // Disable Initializers to prevent the init function from being callable on the implementation contract
         _disableInitializers();
     }
 
-    function init(string memory _name, string memory _symbol) external initializer {
+    // add new func as brean sent in pic 
+    // change to new owner in _authorizeUpgrade
+    // deploy well impl upgradeable by itself
+    // deploy the well with the new impl with the new param 
+
+    // Bore Well
+    // address wellAddress = IAquifer(aquifer).boreWell(
+    //     wellImplementation,
+    //     encodeWellParams(aquifer, wellEncodedData),
+    //     abi.encodeWithSignature("init(string,string,address)", wellName, wellSymbol, owner),
+    //     salt
+    // );
+
+    
+    /**
+    * Perform an upgrade of an ERC1967Proxy, when this contract.
+    * is set as the implementation behind such a proxy.
+    * The _authorizeUpgrade function must be overridden.
+    * to include access restriction to the upgrade mechanism.
+    */
+    function _authorizeUpgrade(address) internal override onlyOwner {}
+
+    function init(string memory _name, string memory _symbol, address owner) external initializer {
+        // owner of well param as the aquifier address will be the owner initially
+        // ownable init transfers ownership to msg.sender
         __ERC20Permit_init(_name);
         __ERC20_init(_name, _symbol);
         __ReentrancyGuard_init();
+        __UUPSUpgradeable_init();
+        // first time this is called the owner will be the msg.sender
+        // which is the aquifer that bore the well
+        __Ownable_init();
+        // then ownership can be transfered to the wanted address 
+        // note: to init owner with __Ownable_init(ownerAddress); we would need to adjust the lib code
+        transferOwnership(owner);
 
         IERC20[] memory _tokens = tokens();
         uint256 tokensLength = _tokens.length;
@@ -64,6 +97,10 @@ contract Well is ERC20PermitUpgradeable, IWell, IWellErrors, ReentrancyGuardUpgr
 
     function isInitialized() external view returns (bool) {
         return _getInitializedVersion() > 0;
+    }
+
+    function getVersion() external pure returns (uint256) {
+        return 1;
     }
 
     //////////////////// WELL DEFINITION ////////////////////
@@ -888,3 +925,4 @@ contract Well is ERC20PermitUpgradeable, IWell, IWellErrors, ReentrancyGuardUpgr
         _;
     }
 }
+
