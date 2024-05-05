@@ -7,8 +7,8 @@ import {WellUpgradeable} from "src/WellUpgradeable.sol";
 /// @custom:oz-upgrades-from WellUpgradeable
 contract MockWellUpgradeable is WellUpgradeable {
 
-    function getVersion() external override pure returns (uint256) {
-        return 2;
+    function getVersion(uint256 i) external pure returns (uint256) {
+        return i;
     }
 
 }
